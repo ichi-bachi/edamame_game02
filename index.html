@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>えだまめくんの豆飛ばしゲーム</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #ccffcc;
+    font-family: "Arial", sans-serif;
+    user-select: none;
+    overflow: hidden;
+  }
+  #gameTitle {
+    text-align: center;
+    font-size: 2em;
+    margin-top: 10px;
+    font-weight: bold;
+    color: #228B22;
+  }
+  #instructions {
+    text-align: center;
+    margin-bottom: 10px;
+    color: #006400;
+  }
+  #scoreBoard {
+    display: flex;
+    justify-content: space-around;
+    margin: 5px;
+    font-size: 1.2em;
+  }
+  #controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 5px;
+  }
+  button {
+    font-size: 1em;
+    padding: 5px 14px;
+    border-radius: 12px;
+    border: none;
+    background-color: #90ee90;
+    cursor: pointer;
+  }
+  button:hover {
+    background-color: #66cc66;
+  }
+  #gameArea {
+    position: relative;
+    width: 100%;
+    height: calc(100vh - 150px);
+    overflow: hidden;
+  }
+  .edamame {
+    position: absolute;
+    cursor: pointer;
+    transition: transform 0.1s;
+  }
+  .bean {
+    position: absolute;
+    pointer-events: none;
+    transition: transform 0.4s ease-out, opacity 0.4s ease-out;
+  }
+  #finishScreen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(255,255,255,0.9);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-size: 2em;
+    color: #006400;
+    z-index: 10;
+    display: none;
+  }
+</style>
+</head>
+<body>
+<div id="gameTitle">えだまめくんの豆飛ばしゲーム</div>
+<div id="instructions">出現する枝豆のふくらみをクリック/タップして豆を飛ばそう！<br>
+30秒で何個飛ばせるかな？ COMBOでBONUSもゲット！</div>
+<div id="scoreBoard">
+  <div>SCORE: <span id="score">0</span></div>
+  <div>COMBO: <span id="combo">0</span></div>
+  <div>BONUS: <span id="bonus">0</span></div>
+  <div>TIME LIMIT: <span id="time">30</span>s</div>
+</div>
+<div id="controls">
+  <button id="startBtn">START</button>
+  <button id="pauseBtn">PAUSE</button>
+  <button id="retryBtn">RETRY</button>
+</div>
+<div id="gameArea"></div>
+<div id="finishScreen">
+  <div>FINISH!</div>
+  <div>BEST SCORE: <span id="finalScore">0</span></div>
+  <div>COMBO: <span id="finalCombo">0</span></div>
+  <div>BONUS: <span id="finalBonus">0</span></div>
+　<button id="retryButton" style="display:none;">RETRY</button>
+</div>
+
+<audio id="bgm" src="bgm3.mp3" loop></audio>
+
+<script>
+const gameArea = document.getElementById('gameArea');
+const scoreEl = document.getElementById('score');
+const comboEl = document.getElementById('combo');
+const bonusEl = document.getElementById('bonus');
+const timeEl = document.getElementById('time');
+const finalScoreEl = document.getElementById('finalScore');
+const finalComboEl = document.getElementById('finalCombo');
+const finalBonusEl = document.getElementById('finalBonus');
+const finishScreen = document.getElementById('finishScreen');
+const bgm = document.getElementById('bgm');
+bgm.volume = 0.2; // 音量20％に
+bgm.play();
+
+
+let score = 0;
+let combo = 0;
+let bonus = 0;
+let timeLeft = 30;
+let gameInterval;
+let spawnInterval;
+let gameRunning = false;
+let pause = false;
+let spawnSpeed = 700; // 初期出現速度(ms)
+let speedUpRate = 0.97; // 出現間隔を短くしていく割合
+let beanLife = 3000; // 枝豆が消えるまでの時間(ms)
+
+function startGame() {
+  resetGame();
+  gameRunning = true;
+  bgm.play();
+  gameInterval = setInterval(updateTimer, 1000);
+  spawnInterval = setInterval(spawnEdamame, spawnSpeed);
+}
+
+function pauseGame() {
+  pause = !pause;
+  if (pause) {
+    bgm.pause();
+  } else {
+    bgm.play();
+  }
+}
+
+function retryGame() {
+  resetGame();
+  startGame();
+}
+
+function resetGame() {
+  clearInterval(gameInterval);
+  clearInterval(spawnInterval);
+  gameArea.innerHTML = '';
+  score = 0;
+  combo = 0;
+  bonus = 0;
+  spawnSpeed = 1000;
+  beanLife = 3000;
+  timeLeft = 30;
+  scoreEl.textContent = score;
+  comboEl.textContent = combo;
+  bonusEl.textContent = bonus;
+  timeEl.textContent = timeLeft;
+  finishScreen.style.display = 'none';
+}
+
+function updateTimer() {
+  if (pause) return;
+  timeLeft--;
+  timeEl.textContent = timeLeft;
+  if (timeLeft <= 0) {
+    endGame();
+  }
+}
+
+function endGame() {
+  clearInterval(gameInterval);
+  clearInterval(spawnInterval);
+  gameRunning = false;
+  bgm.pause();
+  finishScreen.style.display = 'flex';
+  finalScoreEl.textContent = score;
+  finalComboEl.textContent = combo;
+  finalBonusEl.textContent = bonus;
+}
+
+function spawnEdamame() {
+  if (pause) return;
+
+  const type = Math.random() < 0.7 ? 2 : 3;
+  const img = document.createElement('img');
+  img.src = type === 2 ? 'mamesaya2.png' : 'mamesaya3.png';
+  img.className = 'edamame';
+  const size = 90 + Math.random() * 100;
+  img.style.width = size + 'px';
+  img.style.left = Math.random() * (gameArea.clientWidth - size) + 'px';
+  img.style.top = Math.random() * (gameArea.clientHeight - size) + 'px';
+  img.dataset.beans = type;
+  gameArea.appendChild(img);
+
+  img.addEventListener('mousedown', () => popBean(img));
+  img.addEventListener('touchstart', (e) => { e.preventDefault(); popBean(img); });
+
+  setTimeout(() => {
+    if (img.parentNode) img.remove();
+  }, beanLife);
+
+  // 時間経過で早くする
+  spawnSpeed *= speedUpRate;
+  beanLife *= speedUpRate;
+  clearInterval(spawnInterval);
+  spawnInterval = setInterval(spawnEdamame, spawnSpeed);
+}
+
+function popBean(edamame) {
+  const beans = parseInt(edamame.dataset.beans);
+  combo++;
+  score += 1;
+  if (combo % 5 === 0) {
+    bonus += 5;
+    score += 5;
+  }
+  scoreEl.textContent = score;
+  comboEl.textContent = combo;
+  bonusEl.textContent = bonus;
+
+  // 豆アニメーション
+  const rect = edamame.getBoundingClientRect();
+  for (let i = 0; i < beans; i++) {
+    const beanImg = document.createElement('img');
+    beanImg.src = 'mametsubu.png';
+    beanImg.className = 'bean';
+    const beanSize =  100 + Math.random() * 50;
+    beanImg.style.width = beanSize + 'px';
+    beanImg.style.left = (rect.left - gameArea.getBoundingClientRect().left + edamame.clientWidth / 5) + 'px';
+    beanImg.style.top = (rect.top - gameArea.getBoundingClientRect().top + edamame.clientHeight / 5) + 'px';
+    gameArea.appendChild(beanImg);
+
+    const angle = Math.random() * Math.PI * 10;
+    const distance = 150 + Math.random() * 250;
+    setTimeout(() => {
+      beanImg.style.transform = `translate(${Math.cos(angle) * distance}px, ${Math.sin(angle) * distance}px)`;
+      beanImg.style.opacity = 3;
+    }, 80);
+    setTimeout(() => {
+      beanImg.remove();
+    }, 3000);
+  }
+  edamame.remove();
+}
+
+
+
+
+document.getElementById('startBtn').addEventListener('click', startGame);
+document.getElementById('pauseBtn').addEventListener('click', pauseGame);
+document.getElementById('retryBtn').addEventListener('click', retryGame);
+</script>
+</body>
+</html>
